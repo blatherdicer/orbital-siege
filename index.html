@@ -167,7 +167,7 @@ const mir=pts=>pts.map(([x,y])=>[W-x,y]);
 // wave 1: enters top-centre, two columns cross and fan out L/R, swoop low and curl back up into the middle
 const RA=[[124,-12],[104,26],[72,62],[42,100],[30,132],[42,156],[70,158],[92,134],[100,104]];
 // waves 2-3: rise from a bottom corner, throw a full circle left/right of centre, then climb
-const RB=[[-14,276],[28,244],[66,206],[92,180],[104,158],[96,138],[76,132],[60,146],[62,170],[82,182],[102,168],[106,138],[100,104]];
+const RB=[[-14,226],[24,214],[62,198],[92,180],[104,158],[96,138],[76,132],[60,146],[62,170],[82,182],[102,168],[106,138],[100,104]];
 // waves 4-5: enter high on one side, slant down across, hook round low on the far side, climb back
 const RC=[[150,-12],[134,26],[104,70],[72,112],[46,150],[36,180],[50,200],[76,196],[92,172],[98,140],[100,106]];
 const C1=[[-16,120],[50,150],[110,210],[170,200],[190,140],[150,100],[100,120],[90,180],[150,240],[240,290]];
@@ -376,7 +376,7 @@ function update(){
   for(const e of enemies)if(!e.dead)updEnemy(e);
 
   // body collisions
-  for(const r of shipRects())for(const e of enemies){if(e.dead||e.state==='wait'||e.state==='form')continue;const T=TYPES[e.type];
+  for(const r of shipRects())for(const e of enemies){if(e.dead||e.state==='wait'||e.state==='form'||e.state==='path'||e.entering)continue; /* arriving squadrons never ram you */ const T=TYPES[e.type];
     if(Math.abs(e.x-(r.x+7))<T.hw+5&&Math.abs(e.y-(PY+6))<T.hh+4){killEnemy(e);hitShip(r.i);break;}}
 
   // enemy bullets
