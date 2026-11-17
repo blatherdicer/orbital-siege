@@ -150,7 +150,7 @@ let state='title',frame=0,paused=false;
 let score=0,hi=0,lives=3,stage=0,nextExtra=20000,shots=0,hits=0;
 try{hi=parseInt(localStorage.getItem('orbitalSiegeSwarmHi')||'0',10)||0;}catch(e){}
 let enemies=[],bullets=[],ebullets=[],parts=[],popups=[],rescue=null,player=null;
-let phase='intro',phaseT=0,stageClock=0,challenge=false,chHits=0,chTotal=0,attackT=0,formT=0,swayAmp=1,breathAmp=0,msg=null,overT=0,lastShot=-99;
+let phase='intro',phaseT=0,stageClock=0,challenge=false,chHits=0,chTotal=0,attackT=0,formT=0,swayAmp=1,breathAmp=0,msg=null,overT=0,lastShot=-99,chGroup=0,chWait=-1;
 const stars=[];const SC=['#ffffff','#ff6a8a','#7ab8ff','#ffd23c','#3cf0a0','#b66cff'];
 for(let i=0;i<72;i++)stars.push({x:rnd()*W,y:rnd()*H,s:.35+rnd()*1.1,c:pick(SC),ph:(rnd()*64)|0});
 let starSpeed=1;
@@ -169,12 +169,13 @@ function mkEnemy(type,r,c,path,at){
   return{type,r,c,path,launchAt:at,state:'wait',x:-99,y:-99,ang:PI/2,d:0,spd,hp:type==='boss'&&!challenge?2:1,entering:true,dead:false,
     fireD:(!challenge&&stage>=1&&rnd()<.22)?path.len*(.3+rnd()*.3):0};}
 function startStage(){
-  enemies=[];bullets=[];ebullets=[];sfx.beamOff();
+  enemies=[];sfx.beamOff();
   challenge=(stage+1)%4===3;chHits=0;
   formT=0;swayAmp=1;breathAmp=0;attackT=150;stageClock=0;phase='intro';phaseT=0;
   if(challenge){
     const kinds=[['drone','wasp'],['wasp','wasp'],['boss','drone'],['drone','drone'],['wasp','boss']];
-    [PATH.c1,PATH.c1m,PATH.c2,PATH.c3,PATH.c3m].forEach((p,gi)=>{for(let i=0;i<8;i++)enemies.push(mkEnemy(kinds[gi][i&1],-1,-1,p,gi*170+i*8));});
+    [PATH.c1,PATH.c1m,PATH.c2,PATH.c3,PATH.c3m].forEach((p,gi)=>{for(let i=0;i<8;i++){const e=mkEnemy(kinds[gi][i&1],-1,-1,p,gi===0?i*8:Infinity);e.g=gi;e.launchOff=i*8;enemies.push(e);}});
+    chGroup=0;chWait=-1;
     chTotal=enemies.length;
   }else{
     const ord=[4,5,3,6,2,7,1,8,0,9];
@@ -190,12 +191,12 @@ function startStage(){
   }
   sfx.jingle();
 }
-function newGame(){score=0;lives=3;stage=0;nextExtra=20000;shots=0;hits=0;rescue=null;parts=[];popups=[];msg=null;
+function newGame(){bullets=[];ebullets=[];score=0;lives=3;stage=0;nextExtra=20000;shots=0;hits=0;rescue=null;parts=[];popups=[];msg=null;
   player={x:104,py:PY,state:'alive',dual:false,deadT:0,spin:0,capBy:null};startStage();state='play';}
 function gameOver(){state='over';overT=0;sfx.beamOff();try{localStorage.setItem('orbitalSiegeSwarmHi',String(hi));}catch(e){}}
 
 /* ---------- enemies ---------- */
-function startDive(e,silent){Object.assign(e,{state:'dive',diveT:0,busy:true,phase:0,turned:0,turnDir:e.x<112?-1:1,ang:-PI/2,sub:0,looped:0,loopY:132+rnd()*44,
+function startDive(e,silent){Object.assign(e,{state:'dive',diveT:0,busy:true,phase:0,turned:0,turnDir:e.x<112?-1:1,ang:-PI/2,sub:0,looped:0,loopY:156+rnd()*24,
   spd:(2.2+Math.min(stage*.07,1.2))*(e.type==='boss'?.85:1),weave:rnd()*6.28,fireYs:[],beamDive:false,leader:null,escorts:null,escKilled:0});if(!silent)sfx.dive();}
 function enemyFire(e){if(!player||player.state!=='alive'||e.y>PY-50||e.y<0)return;
   const tx=player.x+(player.dual?15:7),vy=2.7+Math.min(stage*.08,1),vx=clamp((tx-e.x)/((PY-e.y)/vy),-1.4,1.4);ebullets.push({x:e.x,y:e.y+5,vx,vy});}
@@ -233,8 +234,8 @@ function updEnemy(e){
       }else if(e.type==='boss'){ // slow, wide sweeping arc with escorts in tow, off the bottom
         e.ang=turnTo(e.ang,Math.atan2(H+40-e.y,px-e.x),e.y<PY-40?.03:0);
       }else{ // drone (and turncoat): arcs toward you, throws a tight loop-the-loop, then drops off the bottom
-        if(e.sub===0){e.ang=turnTo(e.ang,Math.atan2(H+40-e.y,px-e.x),.045);if(e.y>=e.loopY){e.sub=1;e.loopDir=px>e.x?-1:1;}}
-        else if(e.sub===1){e.ang+=e.loopDir*.1;e.looped+=.1;if(e.looped>=2*PI)e.sub=2;}
+        if(e.sub===0){e.ang=turnTo(e.ang,Math.atan2(H+40-e.y,px-e.x),.045);if(e.y>=e.loopY){e.sub=1;e.loopDir=rnd()<.5?-1:1;e.loopRate=e.spd/30;}}
+        else if(e.sub===1){e.ang+=e.loopDir*e.loopRate;e.looped+=e.loopRate;if(e.looped>=2*PI)e.sub=2;}
         else e.ang=turnTo(e.ang,Math.atan2(H+40-e.y,px-e.x),e.y<PY-30?.02:0);
       }
       if(e.fireYs.length&&e.y>=e.fireYs[0]){e.fireYs.shift();enemyFire(e);}
@@ -264,7 +265,7 @@ function killEnemy(e){
   addScore(pts);
   burst(e.x,e.y,e.type==='boss'?PAL.boss2:e.type==='turncoat'?PAL.captive:PAL[e.type],16,1.6);sfx.boom();
   if(e.state==='beam')sfx.beamOff();
-  if(player.state==='captured'&&player.capBy===e){player.state='alive';player.py=PY;player.capBy=null;}
+  if(player.state==='captured'&&player.capBy===e){player.state='released';player.capBy=null;msg={t:'FIGHTER RELEASED',t2:'',life:90};}
   if(e.captive){
     if(e.state==='form'){const t=mkEnemy('turncoat',e.r,e.c,PATH.A,0);Object.assign(t,{state:'home',entering:false,x:e.x,y:e.y-15,ang:-PI/2});enemies.push(t);
       msg={t:'YOUR FIGHTER TURNED',t2:'',life:150};}
@@ -281,17 +282,23 @@ function hitShip(i){
   player.state='dead';player.deadT=0;lives--;burst(player.x+7,PY+6,['#ffffff','#ff4d4d','#ffd23c','#4aa8ff'],40,2.2);sfx.die();sfx.beamOff();
 }
 function noThreat(){return!enemies.some(e=>!e.dead&&(e.state==='dive'||e.state==='beam'))&&ebullets.length===0;}
+function tryFire(p){
+  const want=firePressed||(keys.f&&frame-lastShot>=12);
+  if(want&&bullets.length<(p.dual?4:2)){const y=Math.round(p.py)-2;bullets.push({x:p.x+7,y});if(p.dual)bullets.push({x:p.x+22,y});shots++;lastShot=frame;sfx.shoot();}
+}
 function updPlayer(){
   const p=player;
   if(p.state==='alive'){
     const sp=1.75;
     if(keys.l&&!keys.r)p.x-=sp;if(keys.r&&!keys.l)p.x+=sp;
     p.x=clamp(p.x,8,W-8-(p.dual?30:15));
-    const want=firePressed||(keys.f&&frame-lastShot>=12);
-    if(want&&phase!=='intro'&&bullets.length<(p.dual?4:2)){bullets.push({x:p.x+7,y:PY-2});if(p.dual)bullets.push({x:p.x+22,y:PY-2});shots++;lastShot=frame;sfx.shoot();}
-  }else if(p.state==='captured'){
+    p.py=PY;tryFire(p);
+  }else if(p.state==='captured'){ // still able to shoot: destroying the capturing boss frees the ship
+    tryFire(p);
     const e=p.capBy;p.x+=clamp(e.x-7-p.x,-.8,.8);p.py-=.7;p.spin+=.25;
     if(p.py<=e.y+10){e.captive=true;p.state='gone';p.deadT=0;p.capBy=null;lives--;e.beamT=230;msg={t:'FIGHTER CAPTURED',t2:'',life:160};}
+  }else if(p.state==='released'){ // freed from the beam: drop back to the ship row
+    tryFire(p);p.spin=0;p.py=Math.min(PY,p.py+2.2);if(p.py>=PY)p.state='alive';
   }else{
     p.deadT++;if(p.state==='dead'&&p.deadT>70)p.state='gone';
     if(p.state==='gone'){
@@ -356,6 +363,8 @@ function update(){
       if(busy<maxD&&forms.length)launchAttack(forms);}}
 
   // stage end
+  if(challenge&&phase==='run'&&chGroup<4&&enemies.every(e=>e.g!==chGroup||e.dead)){ // next wave only once this one is gone, after 0.5 s
+    if(chWait<0)chWait=30;else if(--chWait<=0){chGroup++;chWait=-1;for(const e of enemies)if(e.g===chGroup)e.launchAt=stageClock+e.launchOff;}}
   if(phase==='run'&&enemies.every(e=>e.dead)&&!rescue&&player.state!=='captured'){phase=challenge?'chResult':'clear';phaseT=0;}
   if(phase==='clear'&&phaseT>100){stage++;startStage();}
   if(phase==='chResult'){if(phaseT===90){const bonus=chHits===chTotal?10000:chHits*100;addScore(bonus);if(chHits===chTotal)sfx.perfect();}if(phaseT>260){stage++;startStage();}}
@@ -399,11 +408,11 @@ function drawPlay(){
   for(const b of ebullets){ctx.fillStyle=(frame>>2)&1?'#ff6a8a':'#ffd23c';ctx.fillRect(Math.round(b.x)-1,b.y|0,2,5);}
   const p=player;
   if(p.state==='alive'){drawShip(p.x,PY,PAL.ship);if(p.dual)drawShip(p.x+15,PY,PAL.ship);}
-  else if(p.state==='captured')drawShip(p.x,p.py,PAL.ship,p.spin);
+  else if(p.state==='captured'||p.state==='released')drawShip(p.x,Math.round(p.py),PAL.ship,p.spin);
   for(const q of parts){ctx.fillStyle=q.c;const s=q.life>22?2:1;ctx.fillRect(q.x|0,q.y|0,s,s);}
   for(const u of popups)text(u.t,u.x|0,u.y|0,u.c);
   hud();
-  const reserve=Math.max(0,lives-(p.state==='alive'||p.state==='captured'?1:0));
+  const reserve=Math.max(0,lives-(p.state==='alive'||p.state==='captured'||p.state==='released'?1:0));
   for(let i=0;i<Math.min(reserve,6);i++)drawShip(4+i*16,H-15,PAL.ship);
   rtext('STAGE '+(stage+1),W-4,H-10,'#7ab8ff');
   if(phase==='intro'){if(challenge)ctext('CHALLENGING STAGE',140,'#7ab8ff');else ctext('STAGE '+(stage+1),140,'#7ab8ff');if(phaseT>50&&stage===0&&p.state==='alive')ctext('READY',156,'#ff4d4d');}
