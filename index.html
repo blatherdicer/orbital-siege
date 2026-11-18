@@ -44,7 +44,7 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
 'use strict';
 const W=224,H=288,PY=250,PI=Math.PI;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;
-let K=1,ALPHA=1; // K: device pixels per arcade pixel; ALPHA: blend between the last two 60 Hz updates
+let K=1,KMAX=3,ALPHA=1; // K: device pixels per arcade pixel; ALPHA: blend between the last two 60 Hz updates
 const SNAP=v=>Math.round(v*K)/K;
 const rnd=Math.random,clamp=(v,a,b)=>v<a?a:v>b?b:v,pick=a=>a[(rnd()*a.length)|0];
 
@@ -88,11 +88,11 @@ function drawRot(sp,pal,x,y,ang){let r=ang+PI/2;r=Math.round(r/(PI/8))*(PI/8);
 const F={'0':[62,81,73,69,62],'1':[0,66,127,64,0],'2':[66,97,81,73,70],'3':[33,65,69,75,49],'4':[24,20,18,127,16],'5':[39,69,69,69,57],'6':[60,74,73,73,48],'7':[1,113,9,5,3],'8':[54,73,73,73,54],'9':[6,73,73,41,30],
 A:[126,17,17,17,126],B:[127,73,73,73,54],C:[62,65,65,65,34],D:[127,65,65,34,28],E:[127,73,73,73,65],F:[127,9,9,9,1],G:[62,65,73,73,122],H:[127,8,8,8,127],I:[0,65,127,65,0],J:[32,64,65,63,1],K:[127,8,20,34,65],L:[127,64,64,64,64],M:[127,2,12,2,127],N:[127,4,8,16,127],O:[62,65,65,65,62],P:[127,9,9,9,6],Q:[62,65,81,33,94],R:[127,9,25,41,70],S:[70,73,73,73,49],T:[1,1,127,1,1],U:[63,64,64,64,63],V:[31,32,64,32,31],W:[63,64,56,64,63],X:[99,20,8,20,99],Y:[7,8,112,8,7],Z:[97,81,73,69,67],
 '-':[8,8,8,8,8],'=':[20,20,20,20,20],'.':[0,96,96,0,0],'?':[2,1,81,9,6],'!':[0,0,95,0,0],':':[0,54,54,0,0],'/':[32,16,8,4,2],'+':[8,8,62,8,8],'%':[35,19,8,100,98],' ':[0,0,0,0,0]};
-const textCache=new Map();
-function text(s,x,y,col){s=String(s).toUpperCase();if(!s.length)return;const key=col+'|'+s;let c=textCache.get(key);
-  if(!c){if(textCache.size>300)textCache.clear();c=document.createElement('canvas');c.width=s.length*6;c.height=7;const g=c.getContext('2d');g.fillStyle=col;
-    for(let i=0;i<s.length;i++){const gl=F[s[i]]||F['?'];for(let cc=0;cc<5;cc++){const b=gl[cc];for(let r=0;r<7;r++)if(b>>r&1)g.fillRect(i*6+cc,r,1,1);}}textCache.set(key,c);}
-  ctx.drawImage(c,x,y);}
+const glyphCache=new Map();
+function glyph(ch,col){const key=col+ch;let c=glyphCache.get(key);
+  if(!c){c=document.createElement('canvas');c.width=5;c.height=7;const g=c.getContext('2d');g.fillStyle=col;const gl=F[ch]||F['?'];
+    for(let cc=0;cc<5;cc++){const b=gl[cc];for(let r=0;r<7;r++)if(b>>r&1)g.fillRect(cc,r,1,1);}glyphCache.set(key,c);}return c;}
+function text(s,x,y,col){s=String(s).toUpperCase();for(let i=0;i<s.length;i++)if(s[i]!==' ')ctx.drawImage(glyph(s[i],col),x+i*6,y);}
 const ctext=(s,y,col)=>text(s,Math.floor((W-String(s).length*6+1)/2),y,col);
 const rtext=(s,xr,y,col)=>text(s,xr-String(s).length*6+1,y,col);
 
@@ -209,7 +209,7 @@ if(isPhone){document.getElementById('pad').style.display='flex';
   cv.addEventListener('pointerdown',()=>{if(state!=='play')firePressed=true;});}
 function fit(){const cs=getComputedStyle(document.getElementById('wrap')),pv=parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom),ph=parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight);
   const aw=innerWidth-8-ph,ah=innerHeight-16-pv-(isPhone?112:0);let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
-  const dpr=window.devicePixelRatio||1,k=Math.max(1,Math.min(8,Math.floor(s*dpr)));
+  const dpr=window.devicePixelRatio||1,k=Math.max(1,Math.min(KMAX,Math.floor(s*dpr)));
   if(k!==K||cv.width!==W*k){K=k;cv.width=W*K;cv.height=H*K;}
   ctx.setTransform(K,0,0,K,0,0);ctx.imageSmoothingEnabled=false;
   const cs2=K/dpr;cv.style.width=W*cs2+'px';cv.style.height=H*cs2+'px';
@@ -582,7 +582,11 @@ function render(){
 let last=performance.now(),acc=0;const STEP=1000/60;
 function snap(){const k=o=>{o.ox=o.x;o.oy=o.y;};if(player){player.ox=player.x;player.oy=player.py;}
   enemies.forEach(k);bullets.forEach(k);ebullets.forEach(k);parts.forEach(k);stars.forEach(k);if(rescue)k(rescue);}
-function loop(t){acc+=Math.min(t-last,100);last=t;while(acc>=STEP){snap();update();acc-=STEP;}ALPHA=paused?1:acc/STEP;render();requestAnimationFrame(loop);}
+let slowT=0,fastT=0;
+function loop(t){const dt=t-last;
+  if(state==='play'&&!paused&&dt<100){if(dt>19){slowT++;fastT=0;}else{fastT++;slowT=Math.max(0,slowT-1);}
+    if(slowT>45&&KMAX>1&&K>1){KMAX=K-1;slowT=0;fit();}}
+  acc+=Math.min(dt,100);last=t;while(acc>=STEP){snap();update();acc-=STEP;}ALPHA=paused?1:acc/STEP;render();requestAnimationFrame(loop);}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(state==='play')paused=true;sfx.beamOff();if(silentEl)try{silentEl.pause();}catch(e){}}else last=performance.now();});
 requestAnimationFrame(loop);
 })();
