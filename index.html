@@ -11,7 +11,7 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none
 canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;background:#000;outline:none}
 #scan{position:absolute;inset:0;pointer-events:none}
 #pad{display:none;width:100%;max-width:520px;justify-content:space-between;align-items:center;padding:0 16px 6px;box-sizing:border-box}
-#pad .grp{display:flex;gap:14px}
+#pad .grp{display:flex;gap:14px;touch-action:none;padding:10px;margin:-10px}
 .btn{width:74px;height:74px;border-radius:50%;border:2px solid #1f4f8b;background:#070d1a;color:#7ab8ff;font:700 24px ui-monospace,monospace;display:flex;align-items:center;justify-content:center;touch-action:none;-webkit-user-select:none;user-select:none}
 .btn.on{background:#13284a}
 #fire{width:92px;height:92px;border-color:#7a2a3c;background:#170a0e;color:#ff6a8a;font-size:17px}
@@ -27,7 +27,7 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
     <button id="mute" aria-label="Toggle sound">SND ON</button>
   </div>
   <div id="pad">
-    <div class="grp"><div class="btn" id="bl">&#9664;</div><div class="btn" id="br">&#9654;</div></div>
+    <div class="grp" id="dpad"><div class="btn" id="bl">&#9664;</div><div class="btn" id="br">&#9654;</div></div>
     <div class="btn" id="fire">FIRE</div>
   </div>
 </div>
@@ -168,7 +168,15 @@ if(isPhone){document.getElementById('pad').style.display='flex';
     const on=e=>{e.preventDefault();unlockAudio();if(key==='f'&&!keys.f)firePressed=true;keys[key]=true;b.classList.add('on');try{b.setPointerCapture(e.pointerId);}catch(_){}};
     const off=()=>{keys[key]=false;b.classList.remove('on');};
     b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);};
-  bind('bl','l');bind('br','r');bind('fire','f');
+  bind('fire','f');
+  /* ◀ ▶ act as one slide pad: the finger can roll/slide between them without lifting; direction = which side of the gap it's on */
+  const dpad=document.getElementById('dpad'),bl=document.getElementById('bl'),br=document.getElementById('br');let padId=null;
+  const steer=x=>{const a=bl.getBoundingClientRect(),c=br.getBoundingClientRect(),mid=(a.right+c.left)/2,left=x<mid;
+    keys.l=left;keys.r=!left;bl.classList.toggle('on',left);br.classList.toggle('on',!left);};
+  const release=e=>{if(e&&e.pointerId!==padId)return;padId=null;keys.l=keys.r=false;bl.classList.remove('on');br.classList.remove('on');};
+  dpad.addEventListener('pointerdown',e=>{e.preventDefault();unlockAudio();padId=e.pointerId;try{dpad.setPointerCapture(e.pointerId);}catch(_){}steer(e.clientX);});
+  dpad.addEventListener('pointermove',e=>{if(e.pointerId===padId){e.preventDefault();steer(e.clientX);}});
+  ['pointerup','pointercancel','lostpointercapture'].forEach(t=>dpad.addEventListener(t,release));
   cv.addEventListener('pointerdown',()=>{if(state!=='play')firePressed=true;});}
 function fit(){const aw=innerWidth-8,ah=innerHeight-16-(isPhone?112:0);let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
   cv.style.width=W*s+'px';cv.style.height=H*s+'px';
