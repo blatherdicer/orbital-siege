@@ -54,6 +54,18 @@ const PAL={
  drone:['#ffd23c','#4aa8ff','#ff4d4d'],wasp:['#ff4d6d','#f2f2ff','#ffd23c'],
  boss:['#3cf0a0','#2f7bff','#ff6ad5'],boss2:['#b66cff','#ff6ad5','#ffd23c'],
  ship:['#f2f2ff','#ff4d4d','#4aa8ff'],captive:['#ff4d4d','#ffd23c','#ffffff']};
+/* stage counter badges (original designs): pennant 1, big pennant 5, shield 10, star 20, diamond 30, crown 50 */
+const BADGE={
+ 1:P(["#....","#oo..","#ooo.","#oo..","#....","#....","#....","#....","#....","#...."]),
+ 5:P(["#......","#ooo...","#ooxxx.","#ooxxxx","#ooxxx.","#ooo...","#......","#......","#......","#......"]),
+ 10:P([".#####.","#ooooo#","#oxxxo#","#oxxxo#","#oxxxo#","#ooooo#",".#ooo#.","..#o#..","...#..."]),
+ 20:P(["....#....","...###...","...#o#...","####o####",".#ooooo#.","..#ooo#..",".#o#.#o#.",".##...##."]),
+ 30:P(["...#...","..#o#..",".#ooo#.","#ooxoo#","#oxxxo#","#ooxoo#",".#ooo#.","..#o#..","...#..."]),
+ 50:P(["#...#...#","##.###.##","#########","#ooxoxoo#","#########",".#######."])};
+const BPAL={1:['#c8c8d8','#ff4d4d','#ff4d4d'],5:['#c8c8d8','#ffd23c','#ff6a8a'],10:['#7ab8ff','#2f4fa8','#f2f2ff'],
+ 20:['#ffd23c','#ff9a3c','#ff9a3c'],30:['#3cf0a0','#1a8a5c','#f2f2ff'],50:['#ffd23c','#ff4d4d','#7ab8ff']};
+function drawBadges(n){const list=[];for(const v of[50,30,20,10,5,1])while(n>=v){list.push(v);n-=v;}
+  let x=W-3;for(let i=list.length-1;i>=0;i--){const sp=BADGE[list[i]];x-=sp.w;ctx.drawImage(img(sp,BPAL[list[i]]),x,H-3-sp.h);x-=2;}}
 const TYPES={drone:{hw:5,hh:4,form:50,dive:100},wasp:{hw:6,hh:4,form:80,dive:160},boss:{hw:7,hh:5,form:150,dive:400},turncoat:{hw:6,hh:5,form:500,dive:1000}};
 const cache=new Map();
 function img(sp,pal){const k=pal.join();let m=cache.get(sp);if(!m){m=new Map();cache.set(sp,m);}let c=m.get(k);
@@ -514,7 +526,7 @@ function drawPlay(){
   hud();
   const reserve=Math.max(0,lives-(p.state==='alive'||p.state==='captured'||p.state==='released'?1:0));
   for(let i=0;i<Math.min(reserve,6);i++)drawShip(4+i*16,H-15,PAL.ship);
-  rtext('STAGE '+(stage+1),W-4,H-10,'#7ab8ff');
+  drawBadges(stage+1);
   if(phase==='intro'){if(gameStartIntro&&phaseT<180)ctext('PLAYER 1',140,'#7ab8ff');else if(challenge)ctext('CHALLENGING STAGE',140,'#7ab8ff');else ctext('STAGE '+(stage+1),140,'#7ab8ff');}
   if(phase==='chResult'){ctext('NUMBER OF HITS  '+chHits,130,'#7ab8ff');
     if(phaseT>=90){if(chHits===chTotal){const fc=['#ffd23c','#ff6a8a','#7ab8ff','#3cf0a0','#f2f2ff'][(frame>>3)%5];ctext('PERFECT!',148,fc);ctext('SPECIAL BONUS 10000',164,'#ffd23c');}else ctext('BONUS  '+chHits*100,148,'#ffd23c');}}
