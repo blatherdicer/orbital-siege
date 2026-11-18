@@ -98,7 +98,7 @@ const rtext=(s,xr,y,col)=>text(s,xr-String(s).length*6+1,y,col);
 
 /* ---------- audio (synthesised) ---------- */
 let AC=null,master=null,noiseBuf=null,muted=false,beamSnd=null;
-function ensureAudio(){
+function ensureAudio(){setTimeout(()=>{try{bakeAll();}catch(e){}},0);
   if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55;const lo=AC.createBiquadFilter(),hi=AC.createBiquadFilter(),comp=AC.createDynamicsCompressor();
     lo.type='lowshelf';lo.frequency.value=180;lo.gain.value=6;hi.type='highshelf';hi.frequency.value=3200;hi.gain.value=-7;
     comp.threshold.value=-18;comp.ratio.value=4;comp.attack.value=.003;comp.release.value=.2;
@@ -127,7 +127,7 @@ function noise(dur,vol,freq){if(!AC||muted)return;const t=AC.currentTime,s=AC.cr
 const seq=(notes,step,type,vol)=>notes.forEach((f,i)=>f&&tone(f,step*.9,type,vol,0,i*step));
 // sound kit: original synthesis, voiced low and weighty (every effect pairs a body/sub layer with its attack)
 const lowSeq=(notes,step,vol)=>notes.forEach((f,i)=>{if(!f)return;tone(f,step*.9,'square',vol*.6,0,i*step);tone(f/2,step*.9,'triangle',vol,0,i*step);});
-const VL={};function voice(k,max,dur){const t=AC?AC.currentTime:0,a=(VL[k]=(VL[k]||[]).filter(x=>x>t));if(a.length>=max)return false;a.push(t+dur);return true;}
+let BAKING=false;const VL={};function voice(k,max,dur){if(BAKING)return true;const t=AC?AC.currentTime:0,a=(VL[k]=(VL[k]||[]).filter(x=>x>t));if(a.length>=max)return false;a.push(t+dur);return true;}
 const sfx={
   shoot(){if(!voice('shot',4,.07))return;tone(620,.07,'square',.05,180);tone(160,.06,'sine',.14,70);noise(.05,.12,1800);},
   boom(){if(!voice('boom',4,.3))return;noise(.32,.45,1800);tone(180,.25,'sine',.32,45);tone(260,.14,'square',.05,60);},
@@ -155,6 +155,17 @@ const sfx={
     f.type='lowpass';f.frequency.value=1200;g.gain.value=.06;o.connect(f);f.connect(g);g.connect(master);o.start();l.start();beamSnd={o,l};},
   beamOff(){if(beamSnd){try{beamSnd.o.stop();beamSnd.l.stop();}catch(e){}beamSnd=null;}}
 };
+/* Frequent effects are rendered once into audio clips (same sound, same mix), then each play is one buffer source
+   instead of ~8 short-lived oscillator/filter/gain nodes -- iPad Safari stutters when it has to create many of those. */
+const SAMPLES={},BAKE={shoot:[.12,'shot',4,.07],boom:[.4,'boom',4,.3],bossHit:[.15],dive:[1.35,'dive',3,1.3],die:[1.8],small:[.65]},RAW={};
+for(const n in BAKE){RAW[n]=sfx[n];const[,vk,vmax,vd]=BAKE[n];
+  sfx[n]=function(){if(!AC||muted)return;const b=SAMPLES[n];if(!b)return RAW[n]();if(vk&&!voice(vk,vmax,vd))return;
+    const src=AC.createBufferSource();src.buffer=b;src.connect(master);src.start();};}
+async function bakeAll(){if(BAKING||!AC||muted||Object.keys(SAMPLES).length)return;BAKING=true;const realAC=AC,realM=master;
+  try{for(const n in BAKE){const off=new OfflineAudioContext(1,Math.ceil(44100*BAKE[n][0]),44100);
+      AC=off;master=off.createGain();master.connect(off.destination);try{RAW[n]();}catch(e){}AC=realAC;master=realM;
+      SAMPLES[n]=await off.startRendering();}}
+  catch(e){}finally{AC=realAC;master=realM;BAKING=false;}}
 const muteBtn=document.getElementById('mute');
 muteBtn.addEventListener('click',e=>{e.stopPropagation();ensureAudio();muted=!muted;muteBtn.textContent=muted?'SND OFF':'SND ON';if(muted)sfx.beamOff();});
 
@@ -209,11 +220,12 @@ if(isPhone){document.getElementById('pad').style.display='flex';
   cv.addEventListener('pointerdown',()=>{if(state!=='play')firePressed=true;});}
 function fit(){const cs=getComputedStyle(document.getElementById('wrap')),pv=parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom),ph=parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight);
   const aw=innerWidth-8-ph,ah=innerHeight-16-pv-(isPhone?112:0);let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
-  const dpr=window.devicePixelRatio||1,k=Math.max(1,Math.min(KMAX,Math.floor(s*dpr)));
+  const dpr=window.devicePixelRatio||1,total=s*dpr,ti=Math.round(total);let k=Math.max(1,Math.min(KMAX,Math.floor(total)));
+  if(Math.abs(total-ti)<.01)for(let c=k;c>=1;c--){if(ti%c===0){k=c;break;}} // e.g. iPad 6 device px/arcade px -> draw at 3, display 2x: uniform pixels
   if(k!==K||cv.width!==W*k){K=k;cv.width=W*K;cv.height=H*K;}
   ctx.setTransform(K,0,0,K,0,0);ctx.imageSmoothingEnabled=false;
-  const cs2=K/dpr;cv.style.width=W*cs2+'px';cv.style.height=H*cs2+'px';
-  scan.style.background=cs2>=2?`repeating-linear-gradient(to bottom,transparent 0,transparent ${cs2*.62}px,rgba(0,0,0,.26) ${cs2*.62}px,rgba(0,0,0,.26) ${cs2}px)`:'none';}
+  cv.style.width=W*s+'px';cv.style.height=H*s+'px';
+  scan.style.background=s>=2?`repeating-linear-gradient(to bottom,transparent 0,transparent ${s*.62}px,rgba(0,0,0,.26) ${s*.62}px,rgba(0,0,0,.26) ${s}px)`:'none';}
 addEventListener('resize',fit);fit();
 
 /* ---------- flight paths (Catmull-Rom splines, sampled for constant speed) ---------- */
