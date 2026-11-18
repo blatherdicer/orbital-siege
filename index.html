@@ -2,11 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Orbital Siege">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Orbital Siege</title>
 <style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-#wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px}
+#wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;box-sizing:border-box;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 #screen{position:relative;line-height:0;box-shadow:0 0 40px rgba(90,140,255,.14)}
 canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;background:#000;outline:none}
 #scan{position:absolute;inset:0;pointer-events:none}
@@ -193,7 +201,8 @@ if(isPhone){document.getElementById('pad').style.display='flex';
   dpad.addEventListener('pointermove',e=>{if(e.pointerId===padId){e.preventDefault();steer(e.clientX);}});
   ['pointerup','pointercancel','lostpointercapture'].forEach(t=>dpad.addEventListener(t,release));
   cv.addEventListener('pointerdown',()=>{if(state!=='play')firePressed=true;});}
-function fit(){const aw=innerWidth-8,ah=innerHeight-16-(isPhone?112:0);let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
+function fit(){const cs=getComputedStyle(document.getElementById('wrap')),pv=parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom),ph=parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight);
+  const aw=innerWidth-8-ph,ah=innerHeight-16-pv-(isPhone?112:0);let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
   cv.style.width=W*s+'px';cv.style.height=H*s+'px';
   scan.style.background=s>=2?`repeating-linear-gradient(to bottom,transparent 0,transparent ${s*.62}px,rgba(0,0,0,.26) ${s*.62}px,rgba(0,0,0,.26) ${s}px)`:'none';}
 addEventListener('resize',fit);fit();
