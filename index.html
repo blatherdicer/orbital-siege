@@ -10,6 +10,12 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none
 #screen{position:relative;line-height:0;box-shadow:0 0 40px rgba(90,140,255,.14)}
 canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;background:#000;outline:none}
 #scan{position:absolute;inset:0;pointer-events:none}
+#pad{display:none;width:100%;max-width:520px;justify-content:space-between;align-items:center;padding:0 16px 6px;box-sizing:border-box}
+#pad .grp{display:flex;gap:14px}
+.btn{width:74px;height:74px;border-radius:50%;border:2px solid #1f4f8b;background:#070d1a;color:#7ab8ff;font:700 24px ui-monospace,monospace;display:flex;align-items:center;justify-content:center;touch-action:none;-webkit-user-select:none;user-select:none}
+.btn.on{background:#13284a}
+#fire{width:92px;height:92px;border-color:#7a2a3c;background:#170a0e;color:#ff6a8a;font-size:17px}
+#fire.on{background:#3a1420}
 #mute{position:absolute;top:6px;right:6px;background:none;border:1px solid #234;color:#5a8;font:600 11px ui-monospace,monospace;padding:4px 7px;border-radius:4px;opacity:.7;line-height:1}
 </style>
 </head>
@@ -19,6 +25,10 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
     <canvas id="c" width="224" height="288" tabindex="0"></canvas>
     <div id="scan"></div>
     <button id="mute" aria-label="Toggle sound">SND ON</button>
+  </div>
+  <div id="pad">
+    <div class="grp"><div class="btn" id="bl">&#9664;</div><div class="btn" id="br">&#9654;</div></div>
+    <div class="btn" id="fire">FIRE</div>
   </div>
 </div>
 <script>
@@ -151,7 +161,16 @@ cv.addEventListener('pointerdown',()=>{ensureAudio();});
 
 /* ---------- layout ---------- */
 const scan=document.getElementById('scan');
-function fit(){const aw=innerWidth-8,ah=innerHeight-16;let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
+/* touch buttons only on phones: a touchscreen whose shorter screen side is under 500 px (iPads and computers are larger) */
+const isPhone=matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<500;
+if(isPhone){document.getElementById('pad').style.display='flex';
+  const bind=(id,key)=>{const b=document.getElementById(id);
+    const on=e=>{e.preventDefault();unlockAudio();if(key==='f'&&!keys.f)firePressed=true;keys[key]=true;b.classList.add('on');try{b.setPointerCapture(e.pointerId);}catch(_){}};
+    const off=()=>{keys[key]=false;b.classList.remove('on');};
+    b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);};
+  bind('bl','l');bind('br','r');bind('fire','f');
+  cv.addEventListener('pointerdown',()=>{if(state!=='play')firePressed=true;});}
+function fit(){const aw=innerWidth-8,ah=innerHeight-16-(isPhone?112:0);let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
   cv.style.width=W*s+'px';cv.style.height=H*s+'px';
   scan.style.background=s>=2?`repeating-linear-gradient(to bottom,transparent 0,transparent ${s*.62}px,rgba(0,0,0,.26) ${s*.62}px,rgba(0,0,0,.26) ${s}px)`:'none';}
 addEventListener('resize',fit);fit();
@@ -463,9 +482,9 @@ function drawTitle(){
   text('IN FORMATION / DIVING',48,84,'#6a7a99');
   rows.forEach(([k,s],i)=>{const y=104+i*20;drawRot(SP[k][f],PAL[k],70,y+3,-PI/2);text(s,88,y,'#f2f2ff');});
   drawRot(SP.ship,PAL.captive,70,170,-PI/2);text('RESCUE A CAPTURED',88,163,'#f2f2ff');text('SHIP FOR TWIN FIRE',88,173,'#f2f2ff');
-  if((frame>>5)&1)ctext('PRESS SPACE TO START',204,'#ffd23c');
+  if((frame>>5)&1)ctext(isPhone?'TAP FIRE TO START':'PRESS SPACE TO START',204,'#ffd23c');
   ctext('ARROWS OR A/D MOVE',220,'#6a7a99');ctext('SPACE FIRES   P PAUSES',230,'#6a7a99');ctext('CONTROLLER: STICK + X',240,'#6a7a99');
-  if(!usingKeys)ctext('IPAD: TAP SCREEN FIRST',254,'#6a7a99');
+  if(!usingKeys&&!isPhone)ctext('IPAD: TAP SCREEN FIRST',254,'#6a7a99');
 }
 function drawOver(){
   hud();ctext('GAME OVER',96,'#ff4d4d');
@@ -473,7 +492,7 @@ function drawOver(){
   text('SHOTS FIRED',40,144,'#ffd23c');rtext(shots,184,144,'#ffd23c');
   text('NUMBER OF HITS',40,158,'#ffd23c');rtext(hits,184,158,'#ffd23c');
   const ratio=shots?(hits/shots*100).toFixed(1):'0.0';text('HIT-MISS RATIO',40,172,'#f2f2ff');rtext(ratio+'%',184,172,'#f2f2ff');
-  if(overT>90&&(frame>>5)&1)ctext('PRESS SPACE',210,'#6a7a99');
+  if(overT>90&&(frame>>5)&1)ctext(isPhone?'TAP FIRE':'PRESS SPACE',210,'#6a7a99');
 }
 function render(){
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);drawStars();
