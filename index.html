@@ -42,7 +42,10 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
 <script>
 (()=>{
 'use strict';
-const W=224,H=288,PY=250,PI=Math.PI;
+const W=224,PI=Math.PI;
+const PHONE=matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<500;
+/* phones get a taller playfield (up to 400 vs the arcade's 288) to use the screen; the extra room goes between the formation and the ship */
+const H=PHONE?Math.max(288,Math.min(400,Math.round(W*(innerHeight-16-112-48)/Math.max(1,innerWidth-8)))):288,PY=H-38;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;
 let K=1,KMAX=3,ALPHA=1; // K: device pixels per arcade pixel; ALPHA: blend between the last two 60 Hz updates
 const SNAP=v=>Math.round(v*K)/K;
@@ -202,7 +205,7 @@ cv.addEventListener('pointerdown',()=>{ensureAudio();});
 /* ---------- layout ---------- */
 const scan=document.getElementById('scan');
 /* touch buttons only on phones: a touchscreen whose shorter screen side is under 500 px (iPads and computers are larger) */
-const isPhone=matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<500;
+const isPhone=PHONE;
 if(isPhone){document.getElementById('pad').style.display='flex';
   const bind=(id,key)=>{const b=document.getElementById(id);
     const on=e=>{e.preventDefault();unlockAudio();if(key==='f'&&!keys.f)firePressed=true;keys[key]=true;b.classList.add('on');try{b.setPointerCapture(e.pointerId);}catch(_){}};
@@ -217,7 +220,7 @@ if(isPhone){document.getElementById('pad').style.display='flex';
   dpad.addEventListener('pointerdown',e=>{e.preventDefault();unlockAudio();padId=e.pointerId;try{dpad.setPointerCapture(e.pointerId);}catch(_){}steer(e.clientX);});
   dpad.addEventListener('pointermove',e=>{if(e.pointerId===padId){e.preventDefault();steer(e.clientX);}});
   ['pointerup','pointercancel','lostpointercapture'].forEach(t=>dpad.addEventListener(t,release));
-  cv.addEventListener('pointerdown',()=>{if(state!=='play')firePressed=true;});}
+  cv.addEventListener('pointerdown',()=>{if(state!=='play'||paused)firePressed=true;});}
 function fit(){const cs=getComputedStyle(document.getElementById('wrap')),pv=parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom),ph=parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight);
   const aw=innerWidth-8-ph,ah=innerHeight-16-pv-(isPhone?112:0);let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,1);
   const dpr=window.devicePixelRatio||1,total=s*dpr,ti=Math.round(total);let k=Math.max(1,Math.min(KMAX,Math.floor(total)));
@@ -327,7 +330,7 @@ function newGame(){gameStartIntro=true;pendingCaptive=false;bullets=[];ebullets=
 function gameOver(){state='over';overT=0;sfx.beamOff();try{localStorage.setItem('orbitalSiegeSwarmHi',String(hi));}catch(e){}}
 
 /* ---------- enemies ---------- */
-function startDive(e,silent){Object.assign(e,{state:'dive',diveT:0,busy:true,phase:0,turned:0,turnDir:e.x<112?-1:1,ang:-PI/2,sub:0,looped:0,loopY:156+rnd()*24,
+function startDive(e,silent){Object.assign(e,{state:'dive',diveT:0,busy:true,phase:0,turned:0,turnDir:e.x<112?-1:1,ang:-PI/2,sub:0,looped:0,loopY:PY-94+rnd()*24,
   spd:(1.75+Math.min(stage*.08,1.05))*(e.type==='boss'?.85:1),weave:rnd()*6.28,fireYs:[],beamDive:false,leader:null,escorts:null,escKilled:0});if(!silent)sfx.dive();}
 function enemyFire(e){if(!player||player.state!=='alive'||e.y>PY-110||e.y<0)return; // never fire from point-blank range
   const tx=player.x+(player.dual?15:7),vy=2.7+Math.min(stage*.08,1),vx=clamp((tx-e.x)/((PY-e.y)/vy),-1.4,1.4);ebullets.push({x:e.x,y:e.y+5,vx,vy});}
@@ -361,8 +364,8 @@ function updEnemy(e){
     else{
       const px=(player&&player.state==='alive')?player.x+7:e.x;
       if(e.beamDive){ // boss heading for a tractor-beam spot above the player
-        e.ang=turnTo(e.ang,Math.atan2(176-e.y,e.beamX-e.x),.07);
-        if(e.y>=158){e.state='beam';e.beamT=0;e.ang=PI/2;e.x=clamp(e.x,16,W-16);break;}
+        e.ang=turnTo(e.ang,Math.atan2(PY-74-e.y,e.beamX-e.x),.07);
+        if(e.y>=PY-92){e.state='beam';e.beamT=0;e.ang=PI/2;e.x=clamp(e.x,16,W-16);break;}
       }else if(e.type==='wasp'){ // weaving zig-zag swoop, then pulls a U-turn and climbs straight back into formation
         if(e.sub===0){e.ang=turnTo(e.ang,Math.atan2(H-e.y,px-e.x),.035)+Math.cos(e.diveT*.13+e.weave)*.085;
           if(e.y>=PY-72){e.sub=1;e.uDir=e.x<112?-1:1;}}
@@ -457,7 +460,7 @@ function update(){
   if(pausePressed){pausePressed=false;if(state==='play'){paused=!paused;if(paused)sfx.beamOff();}}
   const sTarget=state==='play'&&player&&player.state!=='alive'?.15:1;starSpeed+=(sTarget-starSpeed)*.05;
   if(!paused)for(const s of stars){s.y+=s.s*starSpeed;if(s.y>H){s.y=0;s.x=rnd()*W;}}
-  if(paused){firePressed=false;return;}
+  if(paused){if(firePressed&&state==='play')paused=false;firePressed=false;return;}
   if(state==='title'){if(firePressed){firePressed=false;newGame();}return;}
   if(state==='over'){overT++;if(firePressed&&overT>90)state='title';firePressed=false;if(overT>900)state='title';updFx();return;}
 
@@ -564,7 +567,7 @@ function drawPlay(){
   if(phase==='chResult'){ctext('NUMBER OF HITS  '+chHits,130,'#7ab8ff');
     if(phaseT>=90){if(chHits===chTotal){const fc=['#ffd23c','#ff6a8a','#7ab8ff','#3cf0a0','#f2f2ff'][(frame>>3)%5];ctext('PERFECT!',148,fc);ctext('SPECIAL BONUS 10000',164,'#ffd23c');}else ctext('BONUS  '+chHits*100,148,'#ffd23c');}}
   if(msg)ctext(msg.t,150,msg.t==='FIGHTER CAPTURED'||msg.t==='YOUR FIGHTER TURNED'?'#ff4d4d':'#7ab8ff');
-  if(paused)ctext('PAUSED',170,'#f2f2ff');
+  if(paused){ctext('PAUSED',H/2-10|0,'#f2f2ff');ctext(isPhone?'TAP FIRE TO RESUME':'PRESS FIRE OR P TO RESUME',H/2+4|0,'#6a7a99');}
 }
 function drawTitle(){
   hud();
