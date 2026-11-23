@@ -22,6 +22,7 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
 #pad .grp{display:flex;gap:14px;touch-action:none;padding:10px;margin:-10px}
 .btn{width:74px;height:74px;border-radius:50%;border:2px solid #1f4f8b;background:#070d1a;color:#7ab8ff;font:700 24px ui-monospace,monospace;display:flex;align-items:center;justify-content:center;touch-action:none;-webkit-user-select:none;user-select:none}
 .btn.on{background:#13284a}
+#pz{width:46px;height:46px;font-size:13px;letter-spacing:-2px;border-color:#3a4a66;color:#9aa8c4}
 #fire{width:92px;height:92px;border-color:#7a2a3c;background:#170a0e;color:#ff6a8a;font-size:17px}
 #fire.on{background:#3a1420}
 #mute{position:absolute;top:6px;right:6px;background:none;border:1px solid #234;color:#5a8;font:600 11px ui-monospace,monospace;padding:4px 7px;border-radius:4px;opacity:.7;line-height:1}
@@ -36,6 +37,7 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
   </div>
   <div id="pad">
     <div class="grp" id="dpad"><div class="btn" id="bl">&#9664;</div><div class="btn" id="br">&#9654;</div></div>
+    <div class="btn" id="pz" aria-label="Pause">&#10074;&#10074;</div>
     <div class="btn" id="fire">FIRE</div>
   </div>
 </div>
@@ -45,7 +47,9 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
 const W=224,PI=Math.PI;
 const PHONE=matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<500;
 /* phones get a taller playfield (up to 400 vs the arcade's 288) to use the screen; the extra room goes between the formation and the ship */
-const H=PHONE?Math.max(288,Math.min(400,Math.round(W*(innerHeight-16-112-48)/Math.max(1,innerWidth-8)))):288,PY=H-38;
+const TOPBAND=PHONE?50:0; // keeps the score and sound button clear of the Dynamic Island
+document.getElementById('wrap').style.paddingTop=`max(env(safe-area-inset-top), ${TOPBAND}px)`;
+const H=PHONE?Math.max(288,Math.min(400,Math.round(W*(innerHeight-16-112-TOPBAND-34)/Math.max(1,innerWidth-8)))):288,PY=H-38;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;
 let K=1,KMAX=3,ALPHA=1; // K: device pixels per arcade pixel; ALPHA: blend between the last two 60 Hz updates
 const SNAP=v=>Math.round(v*K)/K;
@@ -212,6 +216,7 @@ if(isPhone){document.getElementById('pad').style.display='flex';
     const off=()=>{keys[key]=false;b.classList.remove('on');};
     b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);};
   bind('fire','f');
+  document.getElementById('pz').addEventListener('pointerdown',e=>{e.preventDefault();unlockAudio();if(state==='play')pausePressed=true;});
   /* ◀ ▶ act as one slide pad: the finger can roll/slide between them without lifting; direction = which side of the gap it's on */
   const dpad=document.getElementById('dpad'),bl=document.getElementById('bl'),br=document.getElementById('br');let padId=null;
   const steer=x=>{const a=bl.getBoundingClientRect(),c=br.getBoundingClientRect(),mid=(a.right+c.left)/2,left=x<mid;
@@ -233,7 +238,8 @@ addEventListener('resize',fit);fit();
 
 /* ---------- flight paths (Catmull-Rom splines, sampled for constant speed) ---------- */
 function cr(p0,p1,p2,p3,t){const t2=t*t,t3=t2*t,f=(a,b,c,d)=>.5*(2*b+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3);return[f(p0[0],p1[0],p2[0],p3[0]),f(p0[1],p1[1],p2[1],p3[1])];}
-function makePath(pts){const Q=[pts[0],...pts,pts[pts.length-1]],out=[];
+const SY=y=>y<=110?y:110+(y-110)*(PY-110)/140; // identity on the standard 288-high field
+function makePath(pts){pts=pts.map(([x,y])=>[x,SY(y)]);const Q=[pts[0],...pts,pts[pts.length-1]],out=[];
   for(let i=1;i<Q.length-2;i++)for(let s=0;s<16;s++)out.push(cr(Q[i-1],Q[i],Q[i+1],Q[i+2],s/16));out.push(pts[pts.length-1]);
   const L=[0];for(let i=1;i<out.length;i++)L.push(L[i-1]+Math.hypot(out[i][0]-out[i-1][0],out[i][1]-out[i-1][1]));return{pts:out,L,len:L[L.length-1]};}
 function pathAt(p,d){const n=p.L.length-1;if(d>=p.len)return p.pts[n];let lo=0,hi=n;while(hi-lo>1){const m=(lo+hi)>>1;if(p.L[m]<=d)lo=m;else hi=m;}
