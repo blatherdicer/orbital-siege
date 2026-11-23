@@ -133,14 +133,19 @@ function noise(dur,vol,freq){if(!AC||muted)return;const t=AC.currentTime,s=AC.cr
   f.type='lowpass';f.frequency.setValueAtTime(freq,t);f.frequency.exponentialRampToValueAtTime(80,t+dur);env(g,t,.003,dur,vol);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+dur+.05);}
 const seq=(notes,step,type,vol)=>notes.forEach((f,i)=>f&&tone(f,step*.9,type,vol,0,i*step));
 // sound kit: original synthesis, voiced low and weighty (every effect pairs a body/sub layer with its attack)
+const midi=n=>440*Math.pow(2,(n-69)/12);
+function music(lead,bass,step,drums){if(!AC||muted)return;let t=0;
+  for(const[n,len]of lead){if(n){tone(midi(n),step*len*.92,'square',.07,0,t);tone(midi(n),step*len*.92,'triangle',.05,0,t);}t+=step*len;}
+  let tb=0;for(const[n,len]of bass){if(n)tone(midi(n),step*len*.9,'triangle',.2,0,tb);tb+=step*len;}
+  if(drums)for(let b=1;b*2*step<t;b+=2)setTimeout(()=>noise(.07,.18,2600),b*2*step*1000);}
 const lowSeq=(notes,step,vol)=>notes.forEach((f,i)=>{if(!f)return;tone(f,step*.9,'square',vol*.6,0,i*step);tone(f/2,step*.9,'triangle',vol,0,i*step);});
 let BAKING=false;const VL={};function voice(k,max,dur){if(BAKING)return true;const t=AC?AC.currentTime:0,a=(VL[k]=(VL[k]||[]).filter(x=>x>t));if(a.length>=max)return false;a.push(t+dur);return true;}
 const sfx={
   shoot(){if(!voice('shot',4,.07))return;tone(620,.07,'square',.05,180);tone(160,.06,'sine',.14,70);noise(.05,.12,1800);},
   boom(){if(!voice('boom',4,.3))return;noise(.32,.45,1800);tone(180,.25,'sine',.32,45);tone(260,.14,'square',.05,60);},
   bossHit(){tone(300,.08,'square',.07,420);tone(140,.1,'sine',.18,90);},
-  arrive(){if(!voice('arrive',5,.55))return;tone(1300,.5,'triangle',.035,260);tone(650,.5,'sine',.025,130);},
-  dive(){if(!voice('dive',3,1.3))return;tone(900,1.3,'triangle',.07,150);tone(450,1.3,'sine',.05,75);}, // long falling whistle, now an octave lower with a sub layer
+  arrive(){if(!voice('arrive',6,.5))return;tone(1600,.45,'square',.09,340);tone(1606,.45,'triangle',.22,342);tone(800,.45,'sine',.14,170);},
+  dive(){if(!voice('dive',4,1.3))return;tone(2000,1.25,'square',.08,220);tone(2012,1.25,'triangle',.2,222);tone(1000,1.25,'sine',.13,110);}, // long falling whistle: bright attack, heavy body
   die(){ // the big one: hard crack, then ~1.5 s of heavy low rumble decaying away
     if(!AC||muted)return;const t=AC.currentTime;
     noise(.1,.55,3000);
@@ -150,7 +155,14 @@ const sfx={
     s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+1.75);
     tone(80,1.2,'sine',.5,28);tone(160,.6,'square',.07,40);},
   small(){noise(.6,.45,1400);tone(120,.5,'sine',.32,35);},
-  jingle(){lowSeq([196,262,330,262,294,349,440,0,392,494,587],.09,.06);},
+  jingle(){ /* stage-start sting (original): rising arpeggio into a held chord */
+    music([[69,1],[74,1],[78,1],[81,3]],[[50,2],[57,2],[50,2]],.11);},
+  theme(){ /* game-start theme (original): two phrases over a walking bass, with a light snare, ~5 s */
+    const lead=[[62,1],[66,1],[69,1],[74,1],[73,1],[71,1],[69,1],[66,1],[67,1],[69,1],[71,1],[74,1],[76,2],[74,2],
+                [74,1],[76,1],[78,1],[81,1],[79,1],[78,1],[76,1],[74,1],[73,1],[76,1],[74,1],[71,1],[74,4]];
+    const bass=[[38,2],[45,2],[38,2],[45,2],[45,2],[52,2],[45,2],[49,2],[43,2],[50,2],[43,2],[50,2],[45,2],[52,2],[45,2],[40,2],
+                [38,2],[45,2],[38,2],[45,2],[43,2],[50,2],[43,2],[47,2],[45,2],[52,2],[45,2],[49,2],[38,4],[0,4]];
+    music(lead,bass,.16,true);},
   captured(){lowSeq([440,415,392,370,349,330,311,294,277,262],.12,.07);},
   rescue(){lowSeq([262,330,392,523,392,523,659],.08,.06);},
   perfect(){ // original victory fanfare: rising call, answer, run down, big final chord
@@ -330,7 +342,7 @@ function startStage(){
     G.forEach((g,gi)=>g.forEach(([p,types,ab])=>types.forEach((t,i)=>{const[r,c]=slots[t].shift();
       const e=mkEnemy(t,r,c,p,[0,210,360,570,720][gi]+(ab===2?(i>>1)*13:i*11));e.off=ab===2?((i&1)?7:-7):0;enemies.push(e);})));
   }
-  sfx.jingle();
+  if(gameStartIntro)sfx.theme();else sfx.jingle();
 }
 function newGame(){gameStartIntro=true;pendingCaptive=false;bullets=[];ebullets=[];score=0;lives=3;stage=0;nextExtra=20000;shots=0;hits=0;rescue=null;parts=[];popups=[];msg=null;
   player={x:104,py:PY,state:'alive',dual:false,deadT:0,spin:0,capBy:null};startStage();state='play';}
