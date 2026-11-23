@@ -139,6 +139,7 @@ const sfx={
   shoot(){if(!voice('shot',4,.07))return;tone(620,.07,'square',.05,180);tone(160,.06,'sine',.14,70);noise(.05,.12,1800);},
   boom(){if(!voice('boom',4,.3))return;noise(.32,.45,1800);tone(180,.25,'sine',.32,45);tone(260,.14,'square',.05,60);},
   bossHit(){tone(300,.08,'square',.07,420);tone(140,.1,'sine',.18,90);},
+  arrive(){if(!voice('arrive',5,.55))return;tone(1300,.5,'triangle',.035,260);tone(650,.5,'sine',.025,130);},
   dive(){if(!voice('dive',3,1.3))return;tone(900,1.3,'triangle',.07,150);tone(450,1.3,'sine',.05,75);}, // long falling whistle, now an octave lower with a sub layer
   die(){ // the big one: hard crack, then ~1.5 s of heavy low rumble decaying away
     if(!AC||muted)return;const t=AC.currentTime;
@@ -158,13 +159,13 @@ const sfx={
     [523,659,784,1046].forEach(f=>n(f,1.92,1.1,.055));tone(131,1.2,'sine',.25,0,1.92);noise(.9,.12,6000);},
   life(){lowSeq([392,494,587,784,587,784],.07,.07);},
   beamOn(){if(!AC||muted||beamSnd)return;const o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),f=AC.createBiquadFilter(),g=AC.createGain();
-    o.type='sawtooth';o.frequency.value=165;l.frequency.value=6;lg.gain.value=60;l.connect(lg);lg.connect(o.frequency);
+    o.type='sawtooth';o.frequency.value=165;l.frequency.value=3.5;lg.gain.value=70;l.connect(lg);lg.connect(o.frequency);
     f.type='lowpass';f.frequency.value=1200;g.gain.value=.06;o.connect(f);f.connect(g);g.connect(master);o.start();l.start();beamSnd={o,l};},
   beamOff(){if(beamSnd){try{beamSnd.o.stop();beamSnd.l.stop();}catch(e){}beamSnd=null;}}
 };
 /* Frequent effects are rendered once into audio clips (same sound, same mix), then each play is one buffer source
    instead of ~8 short-lived oscillator/filter/gain nodes -- iPad Safari stutters when it has to create many of those. */
-const SAMPLES={},BAKE={shoot:[.12,'shot',4,.07],boom:[.4,'boom',4,.3],bossHit:[.15],dive:[1.35,'dive',3,1.3],die:[1.8],small:[.65]},RAW={};
+const SAMPLES={},BAKE={shoot:[.12,'shot',4,.07],boom:[.4,'boom',4,.3],bossHit:[.15],dive:[1.35,'dive',3,1.3],arrive:[.55,'arrive',5,.55],die:[1.8],small:[.65]},RAW={};
 for(const n in BAKE){RAW[n]=sfx[n];const[,vk,vmax,vd]=BAKE[n];
   sfx[n]=function(){if(!AC||muted)return;const b=SAMPLES[n];if(!b)return RAW[n]();if(vk&&!voice(vk,vmax,vd))return;
     const src=AC.createBufferSource();src.buffer=b;src.connect(master);src.start();};}
@@ -246,11 +247,11 @@ function pathAt(p,d){const n=p.L.length-1;if(d>=p.len)return p.pts[n];let lo=0,h
   const t=(d-p.L[lo])/((p.L[hi]-p.L[lo])||1),a=p.pts[lo],b=p.pts[hi];return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];}
 const mir=pts=>pts.map(([x,y])=>[W-x,y]);
 // wave 1: enters top-centre, two columns cross and fan out L/R, swoop low and curl back up into the middle
-const RA=[[124,-12],[104,26],[72,62],[42,100],[30,132],[42,156],[70,158],[92,134],[100,104]];
+const RA=[[122,-12],[118,14],[110,34],[96,58],[74,84],[50,110],[34,134],[32,156],[44,172],[64,178],[84,168],[96,146],[100,118],[100,100]];
 // waves 2-3: rise from a bottom corner, throw a full circle left/right of centre, then climb
-const RB=[[-14,226],[24,214],[62,198],[92,180],[104,158],[96,138],[76,132],[60,146],[62,170],[82,182],[102,168],[106,138],[100,104]];
+const RB=[[-12,238],[20,226],[50,208],[78,188],[92,172],[94,154],[84,138],[68,134],[54,144],[52,162],[62,176],[80,178],[92,166],[96,146],[96,120],[96,100]];
 // waves 4-5: enter high on one side, slant down across, hook round low on the far side, climb back
-const RC=[[150,-12],[134,26],[104,70],[72,112],[46,150],[36,180],[50,200],[76,196],[92,172],[98,140],[100,106]];
+const RC=[[132,-12],[124,10],[110,40],[88,72],[64,104],[42,134],[30,158],[38,176],[58,180],[74,166],[86,140],[96,112],[100,96]];
 const C1=[[-16,120],[50,150],[110,210],[170,200],[190,140],[150,100],[100,120],[90,180],[150,240],[240,290]];
 const C2=[[112,-16],[112,60],[70,120],[60,180],[100,210],[150,180],[160,120],[120,80],[60,60],[-24,40]];
 const C3=[[-16,40],[80,60],[160,100],[180,160],[140,200],[80,190],[50,140],[80,90],[180,40],[244,10]];
@@ -291,7 +292,7 @@ const stars=[];const SC=['#ffffff','#ff6a8a','#7ab8ff','#ffd23c','#3cf0a0','#b66
 for(let i=0;i<72;i++)stars.push({x:rnd()*W,y:rnd()*H,s:.35+rnd()*1.1,c:pick(SC),ph:(rnd()*64)|0});
 let starSpeed=1;
 
-function slotPos(r,c){const s=1+breathAmp*.12*(1-Math.cos(formT*.035))/2;return{x:112+Math.sin(formT*.02)*14*swayAmp+(c-4.5)*16*s,y:44+r*16*s};}
+function slotPos(r,c){const s=1+breathAmp*.12*(1-Math.cos(formT*.035))/2;return{x:112+Math.sin(formT*.02)*14*swayAmp+(c-4.5)*16*s,y:50+r*16*s};}
 function turnTo(a,t,m){let d=t-a;while(d>PI)d-=2*PI;while(d<-PI)d+=2*PI;return a+clamp(d,-m,m);}
 const live=()=>enemies.filter(e=>!e.dead);
 const anyCaptive=()=>enemies.some(e=>!e.dead&&e.captive)||!!rescue||(player&&player.state==='captured');
@@ -301,7 +302,7 @@ function popup(t,x,y,c){popups.push({t:String(t),x,y,life:80,c});}
 
 /* ---------- stage building ---------- */
 function mkEnemy(type,r,c,path,at){
-  const spd=Math.min(2.3+stage*.06,3.1);
+  const spd=Math.min(2.5+stage*.04,3.1);
   return{type,r,c,path,launchAt:at,state:'wait',x:-99,y:-99,ang:PI/2,d:0,spd,hp:type==='boss'&&!challenge?2:1,entering:true,dead:false,
     fireD:(!challenge&&stage>=1&&(stage+1)%10!==0&&rnd()<.22)?path.len*(.3+rnd()*.3):0};}
 function startStage(){
@@ -327,7 +328,7 @@ function startStage(){
              [[PATH.Bm,Array(8).fill('wasp'),2]],[[PATH.C,Array(8).fill('drone'),2]],[[PATH.Cm,Array(8).fill('drone'),2]]];
     if(pendingCaptive){pendingCaptive=false;const f=mkEnemy('turncoat',-1,-1,PATH.Am,720+8*11+70);Object.assign(f,{returning:true,fireD:0});enemies.push(f);}
     G.forEach((g,gi)=>g.forEach(([p,types,ab])=>types.forEach((t,i)=>{const[r,c]=slots[t].shift();
-      const e=mkEnemy(t,r,c,p,[0,135,345,570,720][gi]+(ab===2?(i>>1)*13:i*11));e.off=ab===2?((i&1)?7:-7):0;enemies.push(e);})));
+      const e=mkEnemy(t,r,c,p,[0,210,360,570,720][gi]+(ab===2?(i>>1)*13:i*11));e.off=ab===2?((i&1)?7:-7):0;enemies.push(e);})));
   }
   sfx.jingle();
 }
@@ -337,16 +338,16 @@ function gameOver(){state='over';overT=0;sfx.beamOff();try{localStorage.setItem(
 
 /* ---------- enemies ---------- */
 function startDive(e,silent){Object.assign(e,{state:'dive',diveT:0,busy:true,phase:0,turned:0,turnDir:e.x<112?-1:1,ang:-PI/2,sub:0,looped:0,loopY:PY-94+rnd()*24,
-  spd:(1.75+Math.min(stage*.08,1.05))*(e.type==='boss'?.85:1),weave:rnd()*6.28,fireYs:[],beamDive:false,leader:null,escorts:null,escKilled:0});if(!silent)sfx.dive();}
+  spd:(2.1+Math.min(stage*.06,.9))*(e.type==='boss'?.85:1),weave:rnd()*6.28,fireYs:[],beamDive:false,leader:null,escorts:null,escKilled:0});if(!silent)sfx.dive();}
 function enemyFire(e){if(!player||player.state!=='alive'||e.y>PY-110||e.y<0)return; // never fire from point-blank range
-  const tx=player.x+(player.dual?15:7),vy=2.7+Math.min(stage*.08,1),vx=clamp((tx-e.x)/((PY-e.y)/vy),-1.4,1.4);ebullets.push({x:e.x,y:e.y+5,vx,vy});}
+  const tx=player.x+(player.dual?15:7),vy=2.1+Math.min(stage*.05,.9),vx=clamp((tx-e.x)/((PY-e.y)/vy),-.6,.6);ebullets.push({x:e.x,y:e.y+5,vx,vy});}
 function pathPos(e,d){const[a,b]=pathAt(e.path,d);if(!e.off)return[a,b];
   const[p0,q0]=pathAt(e.path,Math.max(0,Math.min(d,e.path.len-2))),[p1,q1]=pathAt(e.path,Math.max(0,Math.min(d,e.path.len-2))+2),tx=p1-p0,ty=q1-q0,l=Math.hypot(tx,ty)||1;
   return[a-ty/l*e.off,b+tx/l*e.off];}
 function toReturn(e){if(e.leaveAfter){e.dead=true;e.gone=true;pendingCaptive=true;return;}const s=slotPos(e.r,e.c);e.state='home';e.x=s.x;e.y=-12;e.ang=PI/2;e.leader=null;}
 function updEnemy(e){
   switch(e.state){
-  case'wait':if(phase==='run'&&stageClock>=e.launchAt){e.state='path';e.d=0;[e.x,e.y]=pathPos(e,0);}break;
+  case'wait':if(phase==='run'&&stageClock>=e.launchAt){e.state='path';e.d=0;[e.x,e.y]=pathPos(e,0);sfx.arrive();}break;
   case'path':{e.d+=e.spd;const[nx,ny]=pathPos(e,e.d);if(nx!==e.x||ny!==e.y)e.ang=Math.atan2(ny-e.y,nx-e.x);e.x=nx;e.y=ny;
     if(e.fireD&&!e.fired&&e.d>=e.fireD){e.fired=true;enemyFire(e);}
     if(e.d>=e.path.len){if(challenge){e.dead=true;e.gone=true;}else if(e.returning)e.state='dock';else e.state='home';}break;}
@@ -372,10 +373,8 @@ function updEnemy(e){
       if(e.beamDive){ // boss heading for a tractor-beam spot above the player
         e.ang=turnTo(e.ang,Math.atan2(PY-74-e.y,e.beamX-e.x),.07);
         if(e.y>=PY-92){e.state='beam';e.beamT=0;e.ang=PI/2;e.x=clamp(e.x,16,W-16);break;}
-      }else if(e.type==='wasp'){ // weaving zig-zag swoop, then pulls a U-turn and climbs straight back into formation
-        if(e.sub===0){e.ang=turnTo(e.ang,Math.atan2(H-e.y,px-e.x),.035)+Math.cos(e.diveT*.13+e.weave)*.085;
-          if(e.y>=PY-72){e.sub=1;e.uDir=e.x<112?-1:1;}}
-        else{e.ang+=e.uDir*.07;const d=Math.atan2(Math.sin(e.ang+PI/2),Math.cos(e.ang+PI/2));if(Math.abs(d)<.12){e.state='home';e.ang=-PI/2;break;}}
+      }else if(e.type==='wasp'){ /* long diagonal sweep toward the ship with a gentle S, straight off the bottom */
+        e.ang=turnTo(e.ang,Math.atan2(H+40-e.y,px-e.x),e.y<PY-50?.03:0)+(e.y<PY-50?Math.cos(e.diveT*.06+e.weave)*.02:0);
       }else if(e.type==='boss'){ // slow, wide sweeping arc with escorts in tow, off the bottom
         e.ang=turnTo(e.ang,Math.atan2(H+40-e.y,px-e.x),e.y<PY-40?.03:0);
       }else{ // drone (and turncoat): arcs toward you, throws a tight loop-the-loop, then drops off the bottom
@@ -402,7 +401,7 @@ function updEnemy(e){
 function killEnemy(e){
   e.dead=true;hits++;
   const T=TYPES[e.type];let pts;
-  if(challenge){pts=100;chHits++;}
+  if(challenge){pts=100;chHits++;if(e.g!==undefined&&enemies.every(o=>o.g!==e.g||o===e||(o.dead&&!o.gone))){addScore(1000);popup(1000,e.x-12,e.y-3,'#7ab8ff');}}
   else if(e.state==='form')pts=T.form;
   else if(e.type==='boss'){pts=400;if(e.escorts&&e.escorts.length)pts=e.escKilled>=2?1600:e.escKilled===1?800:400;popup(pts,e.x-9,e.y-3,'#ffd23c');}
   else pts=T.dive;
