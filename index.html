@@ -67,10 +67,21 @@ const SP={
        P(["......###......","o...#######...o","oo.##x###x##.oo",".oo#########oo.","..o#########o..","...o#######o...","....ooo#ooo....",".......#.......",".......#.......",".......#......."])],
  ship:P([".......#.......",".......#.......","......###......","......###......","...o..###..o...","...o.##x##.o...","...#.##x##.#...","o..#########..o","o..##.###.##..o","#.###########.#","#######.#######","##.o###.###o.##","#..o.......o..#"])
 };
+/* special challenging-stage enemies: original designs */
+const SPX={
+ dart:P(["..o......o..",".ooo....ooo.","oooo.##.oooo","....####....","oooo.##.oooo",".ooo.##.ooo.",".....##.....",".....##.....",".....xx....."]),
+ stinger:P([".....##.....","......#.....",".....#......","..#.####.#..",".##o####o##.","##..####..##","#..######..#","...#.##.#...","..#......#..",".#........#."]),
+ orbiter:P([".....#.....","...#####...","..#ooooo#..",".#oo###oo#.","##o##x##o##",".#oo###oo#.","..#ooooo#..","...#####...",".....#....."]),
+ ray:P(["......#......","....#####....","..##ooooo##..","#####o#o#####",".###ooooo###.","...#.....#...","....#...#....",".....#.#....."]),
+ warlord:P(["#..#..#..#..#","##.##.#.##.##","#############",".#o#######o#.","..#########..",".##.#####.##.","##...###...##","#.....#.....#"]),
+ cruiser:P(["......##......",".....####.....","..##.####.##..",".###o####o###.","##############","#.##.####.##.#","...#..##..#...","..##......##.."])};
+for(const k in SPX)SP[k]=[SPX[k],SPX[k]];
 const PAL={
  drone:['#ffd23c','#4aa8ff','#ff4d4d'],wasp:['#ff4d6d','#f2f2ff','#ffd23c'],
  boss:['#3cf0a0','#2f7bff','#ff6ad5'],boss2:['#b66cff','#ff6ad5','#ffd23c'],
- ship:['#f2f2ff','#ff4d4d','#4aa8ff'],captive:['#ff4d4d','#ffd23c','#ffffff']};
+ ship:['#f2f2ff','#ff4d4d','#4aa8ff'],captive:['#ff4d4d','#ffd23c','#ffffff'],
+ dart:['#3cf0e0','#9fe8ff','#ff6ad5'],stinger:['#ff9a3c','#ffd23c','#ff4d4d'],orbiter:['#c8c8d8','#4aa8ff','#ff4d4d'],
+ ray:['#7a6cff','#3cf0e0','#ffffff'],warlord:['#ffd23c','#ff4d4d','#3cf0a0'],cruiser:['#f2f2ff','#ff4d6d','#4aa8ff']};
 /* stage counter badges (original designs): pennant 1, big pennant 5, shield 10, star 20, diamond 30, crown 50 */
 const BADGE={
  1:P(["#....","#oo..","#ooo.","#oo..","#....","#....","#....","#....","#....","#...."]),
@@ -83,7 +94,9 @@ const BPAL={1:['#c8c8d8','#ff4d4d','#ff4d4d'],5:['#c8c8d8','#ffd23c','#ff6a8a'],
  20:['#ffd23c','#ff9a3c','#ff9a3c'],30:['#3cf0a0','#1a8a5c','#f2f2ff'],50:['#ffd23c','#ff4d4d','#7ab8ff']};
 function drawBadges(n){const list=[];for(const v of[50,30,20,10,5,1])while(n>=v){list.push(v);n-=v;}
   let x=W-3;for(let i=list.length-1;i>=0;i--){const sp=BADGE[list[i]];x-=sp.w;ctx.drawImage(img(sp,BPAL[list[i]]),x,H-3-sp.h);x-=2;}}
-const TYPES={drone:{hw:5,hh:4,form:50,dive:100},wasp:{hw:6,hh:4,form:80,dive:160},boss:{hw:7,hh:5,form:150,dive:400},turncoat:{hw:6,hh:5,form:500,dive:1000}};
+const TYPES={drone:{hw:5,hh:4,form:50,dive:100},wasp:{hw:6,hh:4,form:80,dive:160},boss:{hw:7,hh:5,form:150,dive:400},turncoat:{hw:6,hh:5,form:500,dive:1000},
+ dart:{hw:6,hh:4,form:100,dive:100},stinger:{hw:6,hh:5,form:100,dive:100},orbiter:{hw:5,hh:4,form:100,dive:100},
+ ray:{hw:6,hh:4,form:100,dive:100},warlord:{hw:6,hh:4,form:100,dive:100},cruiser:{hw:7,hh:4,form:100,dive:100}};
 const cache=new Map();
 function img(sp,pal){const k=pal.join();let m=cache.get(sp);if(!m){m=new Map();cache.set(sp,m);}let c=m.get(k);
   if(!c){c=document.createElement('canvas');c.width=sp.w;c.height=sp.h;const g=c.getContext('2d');
@@ -282,16 +295,26 @@ const P_FOUNT=[[112,304],[112,220],[112,120],[104,70],[80,48],[52,56],[32,100],[
 const P_DLOOP=[[-16,50],[40,80],...circ(70,112,26,-PI*.7,1.3*PI,10),[120,150],...circ(150,180,26,-PI*.7,1.3*PI,10),[200,230],[250,304]];
 const pp=(pts)=>[makePath(pts),makePath(mir(pts))];
 const [FIG8,FIG8m]=pp(P_FIG8),[SPI,SPIm]=pp(P_SPIRAL),[ZIG,ZIGm]=pp(P_ZIG),[ORB,ORBm]=pp(P_ORBIT),[WV1,WV1m]=pp(P_WAVE1),[WV2,WV2m]=pp(P_WAVE2),[FNT,FNTm]=pp(P_FOUNT),[DLP,DLPm]=pp(P_DLOOP);
-const g=(path,ab,kinds)=>({path,ab,kinds});
-const CHP=[
- {name:'SWEEP',main:'drone',groups:[g(PATH.c1,1,['drone','wasp']),g(PATH.c1m,1,['wasp']),g(PATH.c2,2,['boss','drone']),g(PATH.c3,2,['drone']),g(PATH.c3m,2,['wasp','boss'])]},
- {name:'FIGURE EIGHT',main:'wasp',groups:[g(FIG8,1,['drone','wasp']),g(FIG8m,1,['wasp']),g(FIG8,2,['boss','wasp']),g(FIG8m,2,['drone']),g(FIG8,2,['wasp','drone'])]},
- {name:'SPIRAL',main:'drone',groups:[g(SPI,1,['wasp']),g(SPIm,1,['drone']),g(SPI,2,['boss','drone']),g(SPIm,2,['wasp','boss']),g(SPI,2,['drone','wasp'])]},
- {name:'ZIG-ZAG',main:'wasp',groups:[g(ZIG,1,['drone']),g(ZIGm,1,['wasp']),g(ZIG,2,['wasp','drone']),g(ZIGm,2,['boss','wasp']),g(ZIG,2,['drone','boss'])]},
- {name:'ORBIT',main:'drone',groups:[g(ORB,1,['boss','wasp']),g(ORBm,1,['wasp','drone']),g(ORB,2,['drone']),g(ORBm,2,['wasp']),g(ORB,2,['boss','drone'])]},
- {name:'WAVES',main:'wasp',groups:[g(WV1,1,['drone']),g(WV1m,1,['wasp']),g(WV2,2,['wasp','boss']),g(WV2m,2,['drone','wasp']),g(WV1,2,['boss','drone'])]},
- {name:'FOUNTAIN',main:'drone',groups:[g(FNT,1,['wasp']),g(FNTm,1,['drone']),g(FNT,2,['boss','wasp']),g(FNTm,2,['drone','boss']),g(FNT,2,['wasp','drone'])]},
- {name:'DOUBLE LOOP',main:'wasp',groups:[g(DLP,1,['drone','wasp']),g(DLPm,1,['wasp','drone']),g(DLP,2,['boss']),g(DLPm,2,['drone']),g(DLP,2,['wasp','boss'])]},
+/* Challenging stages 1 and 2: shapes measured from footage of the original (arcade px, 224x288). */
+const M1_G1=[[100,-12],[100,60],[100,120],[96,170],[84,200],[60,206],[38,180],[26,120],[18,60],[-16,10]];
+const M1_G2=[[-14,115],[40,124],[86,138],[112,150],[138,166],[168,190],[186,214],[176,234],[150,236],[128,214],[116,180],[112,140],[114,80],[116,30],[118,-16]];
+const M1_G3=[[-14,245],[40,240],[80,226],[112,204],[132,178],[142,150],[142,112],[134,92],[122,94],[116,118],[118,160],[130,180],[150,162],[176,122],[202,80],[240,20]];
+const M1_G5=[[96,-12],[98,60],[104,120],[112,166],[124,200],[150,240],[176,300]];
+const M2_G1=[[106,-12],[100,40],[96,100],[100,148],[110,166],[120,148],[124,100],[122,40],[116,-16]];
+const M2_G2=[[-14,246],[50,248],[100,250],[112,248],...circ(110,154,93,PI/2,PI/2-2*PI,22).slice(1),[150,250],[200,248],[240,246]];
+const M2_G4=[[112,-12],[114,60],[110,120],[100,166],[86,200],[60,240],[30,304]];
+const [MA1,MA1m]=pp(M1_G1),[MB1,MB1m]=pp(M1_G2),[MC1,MC1m]=pp(M1_G3),[MD1,MD1m]=pp(M1_G5);
+const [MA2,MA2m]=pp(M2_G1),[MB2,MB2m]=pp(M2_G2),[MD2,MD2m]=pp(M2_G4);
+const g=(path,ab,kinds,path2)=>({path,ab,kinds,path2}); // path2: a second, simultaneous stream (enemies alternate between the two)
+const CHP=[ /* main type per stage follows the documented roster: bees, butterflies, then a special type each (own designs) */
+ {name:'CROSSFIRE',main:'drone',groups:[g(MA1,1,0,MA1m),g(MB1,1,0,MB1m),g(MC1,1,0),g(MC1m,1,0),g(MD1,1,0,MD1m)]},
+ {name:'GRAND LOOP',main:'wasp',groups:[g(MA2,1,0),g(MB2,1,0,MB2m),g(MB2,1,0),g(MD2,2,0),g(MD2m,2,0)]},
+ {name:'SWEEP',main:'dart',groups:[g(PATH.c1,1,0),g(PATH.c1m,1,0),g(PATH.c2,2,0),g(PATH.c3,2,0),g(PATH.c3m,2,0)]},
+ {name:'SPIRAL',main:'stinger',groups:[g(SPI,1,0),g(SPIm,1,0),g(SPI,2,0),g(SPIm,2,0),g(SPI,2,0,SPIm)]},
+ {name:'ORBIT',main:'orbiter',groups:[g(ORB,1,0),g(ORBm,1,0),g(ORB,2,0),g(ORBm,2,0),g(ORB,1,0,ORBm)]},
+ {name:'WAVES',main:'ray',groups:[g(WV1,1,0),g(WV1m,1,0),g(WV2,2,0),g(WV2m,2,0),g(WV1,1,0,WV2m)]},
+ {name:'ZIG-ZAG',main:'warlord',groups:[g(ZIG,1,0),g(ZIGm,1,0),g(ZIG,2,0),g(ZIGm,2,0),g(ZIG,1,0,ZIGm)]},
+ {name:'DOUBLE LOOP',main:'cruiser',groups:[g(DLP,1,0),g(DLPm,1,0),g(FIG8,2,0),g(FIG8m,2,0),g(DLP,1,0,DLPm)]},
 ];
 
 /* ---------- state ---------- */
@@ -324,9 +347,10 @@ function startStage(){
   if(challenge){
     const ci=Math.floor((stage+1-3)/4),pat=CHP[ci%CHP.length],cyc=Math.floor(ci/CHP.length);chName=pat.name;
     const main=pat.main;
-    pat.groups.forEach((grp,gi)=>{for(let i=0;i<8;i++){const e=mkEnemy(gi>=1&&i===0?'boss':main,-1,-1,grp.path,0);
-      e.g=gi;e.launchOff=grp.ab===2?(i>>1)*12:i*8;e.launchAt=gi===0?e.launchOff:Infinity;e.off=grp.ab===2?((i&1)?7:-7):0;
-      e.spd=Math.min(2.5+cyc*.45,3.8);enemies.push(e);}});
+    pat.groups.forEach((grp,gi)=>{for(let i=0;i<8;i++){const two=!!grp.path2,path=two&&(i&1)?grp.path2:grp.path;
+      const e=mkEnemy(gi>=1&&i===0?'boss':main,-1,-1,path,0);
+      e.g=gi;e.launchOff=two||grp.ab===2?(i>>1)*12:i*8;e.launchAt=gi===0?e.launchOff:Infinity;e.off=!two&&grp.ab===2?((i&1)?7:-7):0;
+      e.spd=Math.min(2.5+(ci%CHP.length)*.08+cyc*.45,3.8);enemies.push(e);}});
     chGroup=0;chWait=-1;
     chTotal=enemies.length;
   }else{
@@ -420,7 +444,7 @@ function updEnemy(e){
 function killEnemy(e){
   e.dead=true;hits++;
   const T=TYPES[e.type];let pts;
-  if(challenge){pts=100;chHits++;if(e.g!==undefined&&enemies.every(o=>o.g!==e.g||o===e||(o.dead&&!o.gone))){addScore(1000);popup(1000,e.x-12,e.y-3,'#7ab8ff');}}
+  if(challenge){pts=100;chHits++;if(e.g!==undefined&&enemies.every(o=>o.g!==e.g||o===e||(o.dead&&!o.gone))){const gb=[1000,1000,1500,1500,2000,2000,3000,3000][Math.floor((stage+1-3)/4)%8];addScore(gb);popup(gb,e.x-12,e.y-3,'#7ab8ff');}}
   else if(e.state==='form')pts=T.form;
   else if(e.type==='boss'){pts=400;if(e.escorts&&e.escorts.length)pts=e.escKilled>=2?1600:e.escKilled===1?800:400;popup(pts,e.x-9,e.y-3,'#ffd23c');}
   else pts=T.dive;
