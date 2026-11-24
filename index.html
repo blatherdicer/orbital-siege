@@ -190,7 +190,7 @@ const sfx={
 };
 /* Frequent effects are rendered once into audio clips (same sound, same mix), then each play is one buffer source
    instead of ~8 short-lived oscillator/filter/gain nodes -- iPad Safari stutters when it has to create many of those. */
-const SAMPLES={},BAKE={shoot:[.12,'shot',4,.07],boom:[.4,'boom',4,.3],bossHit:[.15],dive:[1.35,'dive',3,1.3],arrive:[.55,'arrive',5,.55],die:[1.8],small:[.65]},RAW={};
+const SAMPLES={},BAKE={shoot:[.12,'shot',4,.07],boom:[.4,'boom',4,.3],bossHit:[.15],dive:[1.35,'dive',3,1.3],die:[1.8],small:[.65]},RAW={};
 for(const n in BAKE){RAW[n]=sfx[n];const[,vk,vmax,vd]=BAKE[n];
   sfx[n]=function(){if(!AC||muted)return;const b=SAMPLES[n];if(!b)return RAW[n]();if(vk&&!voice(vk,vmax,vd))return;
     const src=AC.createBufferSource();src.buffer=b;src.connect(master);src.start();};}
@@ -383,7 +383,7 @@ function pathPos(e,d){const[a,b]=pathAt(e.path,d);if(!e.off)return[a,b];
 function toReturn(e){if(e.leaveAfter){e.dead=true;e.gone=true;pendingCaptive=true;return;}const s=slotPos(e.r,e.c);e.state='home';e.x=s.x;e.y=-12;e.ang=PI/2;e.leader=null;}
 function updEnemy(e){
   switch(e.state){
-  case'wait':if(phase==='run'&&stageClock>=e.launchAt){e.state='path';e.d=0;[e.x,e.y]=pathPos(e,0);sfx.arrive();}break;
+  case'wait':if(phase==='run'&&stageClock>=e.launchAt){e.state='path';e.d=0;[e.x,e.y]=pathPos(e,0);}break;
   case'path':{e.d+=e.spd;const[nx,ny]=pathPos(e,e.d);if(nx!==e.x||ny!==e.y)e.ang=Math.atan2(ny-e.y,nx-e.x);e.x=nx;e.y=ny;
     if(e.fireD&&!e.fired&&e.d>=e.fireD){e.fired=true;enemyFire(e);}
     if(e.d>=e.path.len){if(challenge){e.dead=true;e.gone=true;}else if(e.returning)e.state='dock';else e.state='home';}break;}
