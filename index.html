@@ -48,8 +48,14 @@ const W=224,PI=Math.PI;
 const PHONE=matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<500;
 /* phones get a taller playfield (up to 400 vs the arcade's 288) to use the screen; the extra room goes between the formation and the ship */
 const TOPBAND=PHONE?50:0; // keeps the score and sound button clear of the Dynamic Island
-document.getElementById('wrap').style.paddingTop=`max(env(safe-area-inset-top), ${TOPBAND}px)`;
-const H=PHONE?Math.max(288,Math.min(400,Math.round(W*(innerHeight-16-112-TOPBAND-34)/Math.max(1,innerWidth-8)))):288,PY=H-38;
+/* Home-screen (standalone) web app: iOS 26 lays a dark fade under the status bar that reaches below the safe area,
+   so the canvas is pushed a further STANDALONE_GAP px down there. */
+const STANDALONE=navigator.standalone===true||matchMedia('(display-mode: standalone),(display-mode: fullscreen)').matches;
+const STANDALONE_GAP=28;
+const wrapEl=document.getElementById('wrap');
+wrapEl.style.paddingTop=STANDALONE?`calc(max(env(safe-area-inset-top), ${TOPBAND}px) + ${STANDALONE_GAP}px)`:`max(env(safe-area-inset-top), ${TOPBAND}px)`;
+const PADV=(cs=>parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom))(getComputedStyle(wrapEl)); // real top+bottom padding in px
+const H=PHONE?Math.max(288,Math.min(400,Math.round(W*(innerHeight-16-112-Math.max(PADV,TOPBAND+34))/Math.max(1,innerWidth-8)))):288,PY=H-38;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;
 let K=1,KMAX=3,ALPHA=1; // K: device pixels per arcade pixel; ALPHA: blend between the last two 60 Hz updates
 const SNAP=v=>Math.round(v*K)/K;
@@ -169,7 +175,7 @@ const sfx={
     noise(.05,.36,6000);noise(.5,.4,2400);tone(150,.5,'sine',.36,32);tone(75,.6,'triangle',.23,28);tone(240,.22,'square',.045,50);});},
   bossHit(){tone(300,.08,'square',.07,420);tone(140,.1,'sine',.18,90);},
   arrive(){if(!voice('arrive',6,.5))return;tone(1600,.45,'square',.09,340);tone(1606,.45,'triangle',.22,342);tone(800,.45,'sine',.14,170);},
-  dive(){if(!voice('dive',4,1.3))return;tone(2000,1.25,'square',.08,220);tone(2012,1.25,'triangle',.2,222);tone(1000,1.25,'sine',.13,110);}, // long falling whistle: bright attack, heavy body
+  dive(){if(!voice('dive',4,1.3))return;tone(2000,1.25,'square',.06,220);tone(2012,1.25,'triangle',.15,222);tone(1000,1.25,'sine',.1,110);}, // long falling whistle: bright attack, heavy body (~-2.5 dB vs earlier)
   die(){ // the big one: hard crack, then ~1.5 s of heavy low rumble decaying away
     if(!AC||muted)return;const t=AC.currentTime;
     noise(.1,.55,3000);
