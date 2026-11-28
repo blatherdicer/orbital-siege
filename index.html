@@ -141,9 +141,9 @@ function unlockAudio(){
 ['pointerdown','pointerup','touchstart','touchend','mousedown','click','keydown','keyup'].forEach(ev=>document.addEventListener(ev,unlockAudio,{capture:true,passive:true}));
 function env(g,t,a,d,v){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d);}
 function tone(f,dur,type,vol,f2,delay=0){if(!AC||muted)return;const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
-  if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);env(g,t,.004,dur,vol);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.05);}
+  if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);env(g,t,.004,dur,vol);o.connect(g);g.connect(OUT||master);o.start(t);o.stop(t+dur+.05);}
 function noise(dur,vol,freq){if(!AC||muted)return;const t=AC.currentTime,s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=noiseBuf;
-  f.type='lowpass';f.frequency.setValueAtTime(freq,t);f.frequency.exponentialRampToValueAtTime(80,t+dur);env(g,t,.003,dur,vol);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+dur+.05);}
+  f.type='lowpass';f.frequency.setValueAtTime(freq,t);f.frequency.exponentialRampToValueAtTime(80,t+dur);env(g,t,.003,dur,vol);s.connect(f);f.connect(g);g.connect(OUT||master);s.start(t);s.stop(t+dur+.05);}
 const seq=(notes,step,type,vol)=>notes.forEach((f,i)=>f&&tone(f,step*.9,type,vol,0,i*step));
 // sound kit: original synthesis, voiced low and weighty (every effect pairs a body/sub layer with its attack)
 const midi=n=>440*Math.pow(2,(n-69)/12);
@@ -153,9 +153,20 @@ function music(lead,bass,step,drums){if(!AC||muted)return;let t=0;
   if(drums)for(let b=1;b*2*step<t;b+=2)setTimeout(()=>noise(.07,.18,2600),b*2*step*1000);}
 const lowSeq=(notes,step,vol)=>notes.forEach((f,i)=>{if(!f)return;tone(f,step*.9,'square',vol*.6,0,i*step);tone(f/2,step*.9,'triangle',vol,0,i*step);});
 let BAKING=false;const VL={};function voice(k,max,dur){if(BAKING)return true;const t=AC?AC.currentTime:0,a=(VL[k]=(VL[k]||[]).filter(x=>x>t));if(a.length>=max)return false;a.push(t+dur);return true;}
+let OUT=null;const IRS=new WeakMap();
+function impulse(dec){let m=IRS.get(AC);if(!m){m={};IRS.set(AC,m);}if(m[dec])return m[dec];
+  const sr=AC.sampleRate,n=Math.ceil(sr*dec),pre=Math.floor(sr*.012),b=AC.createBuffer(2,n+pre,sr);
+  for(let c=0;c<2;c++){const d=b.getChannelData(c);let lp=0;for(let i=0;i<n;i++){const t=i/n;lp+=(rnd()*2-1-lp)*(.55-.4*t);d[i+pre]=lp*Math.pow(1-t,2.2)*Math.exp(-3*t);}}
+  return m[dec]=b;}
+/* wet(): everything synthesised inside fn goes dry to master and through a short dark room reverb */
+function wet(mix,dec,fn){const bus=AC.createGain(),cv=AC.createConvolver(),wg=AC.createGain(),lo=AC.createBiquadFilter();
+  cv.buffer=impulse(dec);wg.gain.value=mix;lo.type='lowpass';lo.frequency.value=2400;
+  bus.connect(master);bus.connect(lo);lo.connect(cv);cv.connect(wg);wg.connect(master);OUT=bus;try{fn();}finally{OUT=null;}}
 const sfx={
-  shoot(){if(!voice('shot',4,.07))return;tone(620,.07,'square',.05,180);tone(160,.06,'sine',.14,70);noise(.05,.12,1800);},
-  boom(){if(!voice('boom',4,.3))return;noise(.32,.45,1800);tone(180,.25,'sine',.32,45);tone(260,.14,'square',.05,60);},
+  shoot(){if(!voice('shot',4,.07))return;wet(.5,.55,()=>{ /* laser: snappy falling zap over a deep thump, short room tail */
+    noise(.035,.27,4200);tone(1100,.13,'square',.06,240);tone(1104,.13,'triangle',.16,242);tone(320,.11,'triangle',.32,85);tone(120,.13,'sine',.46,42);});},
+  boom(){if(!voice('boom',4,.3))return;wet(.75,1.2,()=>{ /* hit: bright crack, crunchy body, deep sub drop, longer tail */
+    noise(.05,.36,6000);noise(.5,.4,2400);tone(150,.5,'sine',.36,32);tone(75,.6,'triangle',.23,28);tone(240,.22,'square',.045,50);});},
   bossHit(){tone(300,.08,'square',.07,420);tone(140,.1,'sine',.18,90);},
   arrive(){if(!voice('arrive',6,.5))return;tone(1600,.45,'square',.09,340);tone(1606,.45,'triangle',.22,342);tone(800,.45,'sine',.14,170);},
   dive(){if(!voice('dive',4,1.3))return;tone(2000,1.25,'square',.08,220);tone(2012,1.25,'triangle',.2,222);tone(1000,1.25,'sine',.13,110);}, // long falling whistle: bright attack, heavy body
@@ -190,7 +201,7 @@ const sfx={
 };
 /* Frequent effects are rendered once into audio clips (same sound, same mix), then each play is one buffer source
    instead of ~8 short-lived oscillator/filter/gain nodes -- iPad Safari stutters when it has to create many of those. */
-const SAMPLES={},BAKE={shoot:[.12,'shot',4,.07],boom:[.4,'boom',4,.3],bossHit:[.15],dive:[1.35,'dive',3,1.3],die:[1.8],small:[.65]},RAW={};
+const SAMPLES={},BAKE={shoot:[.75,'shot',4,.07],boom:[1.6,'boom',4,.3],bossHit:[.15],dive:[1.35,'dive',3,1.3],die:[1.8],small:[.65]},RAW={};
 for(const n in BAKE){RAW[n]=sfx[n];const[,vk,vmax,vd]=BAKE[n];
   sfx[n]=function(){if(!AC||muted)return;const b=SAMPLES[n];if(!b)return RAW[n]();if(vk&&!voice(vk,vmax,vd))return;
     const src=AC.createBufferSource();src.buffer=b;src.connect(master);src.start();};}
